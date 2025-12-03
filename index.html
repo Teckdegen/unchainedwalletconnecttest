@@ -180,6 +180,14 @@
     <div class="container">
         <h1>🔗 Unchained Wallet Connect Test</h1>
         <p class="subtitle">Test all wallet connection methods - PEPU Chain Only</p>
+        <div class="info-box" style="margin-bottom: 20px;">
+            <strong>⚠️ Important:</strong> For Unchained Wallet to work, this test file should be:<br>
+            1. Served as a route in your Next.js app (e.g., create a route at <code>/test-wallet-connect</code>)<br>
+            2. OR served from the same origin as your wallet app<br>
+            3. The wallet app must be running and unlocked<br>
+            <br>
+            <strong>Note:</strong> If opened as a standalone HTML file, only MetaMask/Coinbase will work.
+        </div>
 
         <!-- Status Section -->
         <div class="section">
@@ -394,6 +402,11 @@
                     throw new Error('No wallet detected');
                 }
 
+                // Check if this is Unchained provider (it redirects to /connect page)
+                if (window.ethereum.isUnchained) {
+                    log('Unchained Wallet detected - request will redirect to wallet app for approval', 'info');
+                }
+
                 const accounts = await window.ethereum.request({
                     method: 'eth_requestAccounts'
                 });
@@ -409,7 +422,18 @@
                     throw new Error('No accounts returned');
                 }
             } catch (error) {
-                log(`Connection failed: ${error.message}`, 'error');
+                const errorMsg = error.message || 'Unknown error';
+                
+                // Unchained provider redirects to /connect page - this is expected!
+                if (errorMsg.includes('Redirecting') || errorMsg.includes('redirect') || errorMsg.includes('Unexpected')) {
+                    log('✅ Redirecting to approval page...', 'success');
+                    log('You will be taken to /connect to approve the connection.', 'info');
+                    log('After approval, you will be redirected back here.', 'info');
+                    // Don't show as error - this is expected behavior
+                    return;
+                }
+                
+                log(`Connection failed: ${errorMsg}`, 'error');
             }
         }
 
@@ -460,11 +484,15 @@
                 // (the provider might not be fully initialized yet)
                 if (window.ethereum.isUnchained !== true) {
                     log('Warning: isUnchained flag not set. This might mean:', 'info');
-                    log('1. The Unchained Wallet app is not open in another tab', 'info');
+                    log('1. This test file is not running in the wallet app context', 'info');
                     log('2. The provider is not initialized yet', 'info');
+                    log('3. You need to open this test file as a route in the wallet app', 'info');
                     log('Attempting connection anyway...', 'info');
                 }
 
+                // For Unchained, the request will redirect to /connect page
+                log('Making connection request - if Unchained, you will be redirected to approve...', 'info');
+                
                 const accounts = await window.ethereum.request({
                     method: 'eth_requestAccounts'
                 });
@@ -475,13 +503,23 @@
                     currentChainId = parseInt(chainIdHex, 16);
                     updateStatus();
                     log(`Connected: ${currentAccount}`, 'success');
-                    log(`Note: If this is Unchained, make sure the wallet app is open in another tab.`, 'info');
                 } else {
                     throw new Error('No accounts returned');
                 }
             } catch (error) {
-                log(`Connection failed: ${error.message}`, 'error');
-                log('Tip: Make sure the Unchained Wallet app is open in another browser tab.', 'info');
+                const errorMsg = error.message || 'Unknown error';
+                
+                // Unchained provider redirects to /connect page - this is expected!
+                if (errorMsg.includes('Redirecting') || errorMsg.includes('redirect') || errorMsg.includes('Unexpected')) {
+                    log('✅ Redirecting to approval page...', 'success');
+                    log('You will be taken to /connect to approve the connection.', 'info');
+                    log('After approval, you will be redirected back here automatically.', 'info');
+                    // Don't show as error - this is expected behavior
+                    return;
+                }
+                
+                log(`Connection failed: ${errorMsg}`, 'error');
+                log('Tip: Make sure the Unchained Wallet app is running and unlocked.', 'info');
             }
         }
 
