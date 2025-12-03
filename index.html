@@ -216,8 +216,12 @@
         <div class="section">
             <div class="section-title">Connection Methods</div>
             <div class="info-box">
-                <strong>PEPU Chain:</strong> Chain ID 97741<br>
-                <strong>RPC URL:</strong> https://rpc.pepu.foundation
+                <strong>Network Name:</strong> Pepe Unchained V2<br>
+                <strong>Chain ID:</strong> 97741<br>
+                <strong>RPC URL:</strong> https://rpc-pepu-v2-mainnet-0.t.conduit.xyz<br>
+                <strong>Currency Symbol:</strong> PEPU<br>
+                <strong>Block Explorer:</strong> https://pepuscan.com/<br>
+                <strong>Note:</strong> For Unchained Wallet, make sure the wallet app is open in another browser tab.
             </div>
             <div class="button-group">
                 <button class="btn-primary" onclick="connectDirect()">1. Direct Connect (No UI)</button>
@@ -251,8 +255,8 @@
     <script>
         // PEPU Chain Configuration
         const PEPU_CHAIN_ID = 97741;
-        const PEPU_RPC_URL = 'https://rpc.pepu.foundation';
-        const PEPU_CHAIN_NAME = 'PEPU Mainnet';
+        const PEPU_RPC_URL = 'https://rpc-pepu-v2-mainnet-0.t.conduit.xyz';
+        const PEPU_CHAIN_NAME = 'Pepe Unchained V2';
         const PEPU_EXPLORER = 'https://pepuscan.com';
 
         let currentAccount = null;
@@ -262,6 +266,12 @@
         window.addEventListener('DOMContentLoaded', () => {
             checkWallet();
             setupEventListeners();
+            
+            // Check wallet again after a short delay (in case provider initializes late)
+            setTimeout(() => {
+                log('Re-checking wallet status...', 'info');
+                checkWallet();
+            }, 1000);
         });
 
         // Logging utility
@@ -284,21 +294,26 @@
             if (typeof window.ethereum === 'undefined') {
                 document.getElementById('walletDetected').textContent = 'No Wallet Detected';
                 document.getElementById('walletDetected').className = 'status-value disconnected';
-                log('No wallet detected. Please install Unchained Wallet, MetaMask, or Coinbase Wallet.', 'error');
+                log('No wallet detected. Please make sure you have the Unchained Wallet app open in another tab, or install MetaMask/Coinbase Wallet.', 'error');
                 return false;
             }
 
             const ethereum = window.ethereum;
             let walletType = 'Unknown';
             
-            if (ethereum.isUnchained) {
+            // Check for Unchained first
+            if (ethereum.isUnchained === true) {
                 walletType = 'Unchained Wallet';
-            } else if (ethereum.isMetaMask) {
+            } else if (ethereum.isMetaMask && !ethereum.isUnchained) {
                 walletType = 'MetaMask';
-            } else if (ethereum.isCoinbaseWallet) {
+            } else if (ethereum.isCoinbaseWallet && !ethereum.isUnchained) {
                 walletType = 'Coinbase Wallet';
+            } else if (ethereum.request) {
+                // Generic injected wallet - could be Unchained if provider not fully initialized
+                walletType = 'Injected Wallet (may be Unchained)';
+                log('Note: Wallet detected but isUnchained flag not set. This may be Unchained if the provider is not initialized. Try connecting anyway.', 'info');
             } else {
-                walletType = 'Injected Wallet';
+                walletType = 'Unknown Provider';
             }
 
             document.getElementById('walletDetected').textContent = 'Yes';
@@ -441,8 +456,13 @@
                     throw new Error('No wallet detected');
                 }
 
-                if (!window.ethereum.isUnchained) {
-                    throw new Error('Unchained Wallet not detected. Please install Unchained Wallet.');
+                // Check if isUnchained is set, but also allow connection if wallet exists
+                // (the provider might not be fully initialized yet)
+                if (window.ethereum.isUnchained !== true) {
+                    log('Warning: isUnchained flag not set. This might mean:', 'info');
+                    log('1. The Unchained Wallet app is not open in another tab', 'info');
+                    log('2. The provider is not initialized yet', 'info');
+                    log('Attempting connection anyway...', 'info');
                 }
 
                 const accounts = await window.ethereum.request({
@@ -454,12 +474,14 @@
                     const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
                     currentChainId = parseInt(chainIdHex, 16);
                     updateStatus();
-                    log(`Connected with Unchained: ${currentAccount}`, 'success');
+                    log(`Connected: ${currentAccount}`, 'success');
+                    log(`Note: If this is Unchained, make sure the wallet app is open in another tab.`, 'info');
                 } else {
                     throw new Error('No accounts returned');
                 }
             } catch (error) {
-                log(`Unchained connection failed: ${error.message}`, 'error');
+                log(`Connection failed: ${error.message}`, 'error');
+                log('Tip: Make sure the Unchained Wallet app is open in another browser tab.', 'info');
             }
         }
 
@@ -562,6 +584,7 @@
                                     symbol: 'PEPU',
                                     decimals: 18
                                 },
+                                chainId: `0x${PEPU_CHAIN_ID.toString(16)}`,
                                 rpcUrls: [PEPU_RPC_URL],
                                 blockExplorerUrls: [PEPU_EXPLORER]
                             }],
