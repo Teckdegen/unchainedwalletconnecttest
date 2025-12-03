@@ -583,13 +583,17 @@
             }
         }
 
-        // 6. WalletConnect (simulated - would need actual WalletConnect setup)
+        // 6. WalletConnect
         async function connectWalletConnect() {
-            log('WalletConnect connection...', 'error');
-            log('Note: WalletConnect requires additional setup with project ID and RPC configuration.', 'error');
-            log('For this test, please use direct connection methods above.', 'error');
-            // In a real implementation, this would use WalletConnect SDK
-            // For now, we'll just show a message
+            log('WalletConnect connection...', 'info');
+            log('WalletConnect is for external dApps to connect to your wallet.', 'info');
+            log('To test WalletConnect:', 'info');
+            log('1. External dApps use WalletConnect SDK to generate a connection URI', 'info');
+            log('2. The dApp shows a QR code or deep link', 'info');
+            log('3. Your wallet receives the connection request via WalletConnect', 'info');
+            log('4. You approve on the /connect page', 'info');
+            log('', 'info');
+            log('For testing direct connections, use "Direct Connect" or "Unchained Only" buttons above.', 'info');
         }
 
         // Switch to PEPU Chain
