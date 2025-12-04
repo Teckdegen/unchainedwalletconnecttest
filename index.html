@@ -596,6 +596,10 @@
         async function getBalance() {
             log('Fetching balance...');
             try {
+                const provider = getWalletProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No wallet detected');
+                }
                 if (!currentAccount) {
                     throw new Error('Not connected. Please connect first.');
                 }
@@ -616,6 +620,10 @@
         async function signMessage() {
             log('Requesting message signature...');
             try {
+                const provider = getWalletProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No wallet detected');
+                }
                 if (!currentAccount) {
                     throw new Error('Not connected. Please connect first.');
                 }
