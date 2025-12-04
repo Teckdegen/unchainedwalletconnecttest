@@ -307,9 +307,19 @@
             document.getElementById('log').innerHTML = '';
         }
 
+        // Helper: pick the best provider (Unchained if available)
+        function getWalletProvider() {
+            if (typeof window !== 'undefined') {
+                if (window.unchained) return window.unchained;
+                if (window.ethereum) return window.ethereum;
+            }
+            return null;
+        }
+
         // Check wallet availability
         function checkWallet() {
-            if (typeof window.ethereum === 'undefined') {
+            const provider = getWalletProvider();
+            if (!provider) {
                 document.getElementById('walletDetected').textContent = 'No Wallet Detected';
                 document.getElementById('walletDetected').className = 'status-value disconnected';
 
@@ -322,7 +332,7 @@
                 return false;
             }
 
-            const ethereum = window.ethereum;
+            const ethereum = provider;
             let walletType = 'Unknown';
             
             // Check for Unchained first
@@ -350,9 +360,10 @@
 
         // Setup event listeners
         function setupEventListeners() {
-            if (typeof window.ethereum === 'undefined') return;
+            const provider = getWalletProvider();
+            if (!provider || !provider.on) return;
 
-            window.ethereum.on('accountsChanged', (accounts) => {
+            provider.on('accountsChanged', (accounts) => {
                 if (accounts.length > 0) {
                     currentAccount = accounts[0];
                     updateStatus();
@@ -364,13 +375,13 @@
                 }
             });
 
-            window.ethereum.on('chainChanged', (chainId) => {
+            provider.on('chainChanged', (chainId) => {
                 currentChainId = parseInt(chainId, 16);
                 updateStatus();
                 log(`Chain changed: ${currentChainId}`, 'success');
             });
 
-            window.ethereum.on('disconnect', () => {
+            provider.on('disconnect', () => {
                 currentAccount = null;
                 currentChainId = null;
                 updateStatus();
@@ -412,31 +423,32 @@
 
         // Simple connect using window.ethereum.request (like a normal dApp)
         async function connectWithWindowEthereum() {
-            log('Calling window.ethereum.request({ method: \"eth_requestAccounts\" }) ...');
+            log('Calling provider.request({ method: \"eth_requestAccounts\" }) ...');
 
-            if (typeof window.ethereum === 'undefined') {
-                log('window.ethereum is undefined. No injected wallet detected in this context.', 'error');
-                alert('No wallet detected. window.ethereum is undefined.');
+            const provider = getWalletProvider();
+            if (!provider || !provider.request) {
+                log('No injected wallet provider detected in this context.', 'error');
+                alert('No wallet detected. No injected provider is available.');
                 return;
             }
 
             try {
-                const accounts = await window.ethereum.request({
+                const accounts = await provider.request({
                     method: 'eth_requestAccounts'
                 });
 
                 if (accounts && accounts.length > 0) {
                     currentAccount = accounts[0];
-                    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                    const chainIdHex = await provider.request({ method: 'eth_chainId' });
                     currentChainId = parseInt(chainIdHex, 16);
                     updateStatus();
-                    log(`window.ethereum connected: ${currentAccount}`, 'success');
+                    log(`Provider connected: ${currentAccount}`, 'success');
                 } else {
-                    log('window.ethereum returned no accounts', 'error');
+                    log('Provider returned no accounts', 'error');
                 }
             } catch (error) {
-                log(`window.ethereum request failed: ${error.message}`, 'error');
-                alert(`window.ethereum error: ${error.message}`);
+                log(`Provider request failed: ${error.message}`, 'error');
+                alert(`Provider error: ${error.message}`);
             }
         }
 
@@ -444,22 +456,26 @@
         async function connectDirect() {
             log('Attempting direct connection (no UI)...');
             try {
+                const provider = getWalletProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No wallet detected');
+                }
                 if (!checkWallet()) {
                     throw new Error('No wallet detected');
                 }
 
                 // Check if this is Unchained provider (it redirects to /connect page)
-                if (window.ethereum.isUnchained) {
+                if (provider.isUnchained) {
                     log('Unchained Wallet detected - request will redirect to wallet app for approval', 'info');
                 }
 
-                const accounts = await window.ethereum.request({
+                const accounts = await provider.request({
                     method: 'eth_requestAccounts'
                 });
 
                 if (accounts && accounts.length > 0) {
                     currentAccount = accounts[0];
-                    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                    const chainIdHex = await provider.request({ method: 'eth_chainId' });
                     currentChainId = parseInt(chainIdHex, 16);
                     updateStatus();
                     log(`Connected: ${currentAccount}`, 'success');
@@ -487,6 +503,10 @@
         async function connectWithUI() {
             log('Attempting connection with UI selection...');
             try {
+                const provider = getWalletProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No wallet detected');
+                }
                 if (!checkWallet()) {
                     throw new Error('No wallet detected');
                 }
@@ -500,13 +520,13 @@
                     return;
                 }
 
-                const accounts = await window.ethereum.request({
+                const accounts = await provider.request({
                     method: 'eth_requestAccounts'
                 });
 
                 if (accounts && accounts.length > 0) {
                     currentAccount = accounts[0];
-                    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+                    const chainIdHex = await provider.request({ method: 'eth_chainId' });
                     currentChainId = parseInt(chainIdHex, 16);
                     updateStatus();
                     log(`Connected with UI: ${currentAccount}`, 'success');
@@ -525,11 +545,15 @@
         async function switchToPEPU() {
             log('Switching to PEPU chain...');
             try {
+                const provider = getWalletProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No wallet detected');
+                }
                 if (!checkWallet()) {
                     throw new Error('No wallet detected');
                 }
 
-                await window.ethereum.request({
+                await provider.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: `0x${PEPU_CHAIN_ID.toString(16)}` }],
                 });
@@ -541,7 +565,7 @@
                 // This error code indicates that the chain has not been added to MetaMask
                 if (switchError.code === 4902) {
                     try {
-                        await window.ethereum.request({
+                        await provider.request({
                             method: 'wallet_addEthereumChain',
                             params: [{
                                 chainId: `0x${PEPU_CHAIN_ID.toString(16)}`,
@@ -576,7 +600,7 @@
                     throw new Error('Not connected. Please connect first.');
                 }
 
-                const balance = await window.ethereum.request({
+                const balance = await provider.request({
                     method: 'eth_getBalance',
                     params: [currentAccount, 'latest']
                 });
@@ -601,7 +625,7 @@
                     .map(b => b.toString(16).padStart(2, '0'))
                     .join('');
 
-                const signature = await window.ethereum.request({
+                const signature = await provider.request({
                     method: 'eth_sign',
                     params: [currentAccount, messageHex]
                 });
