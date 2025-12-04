@@ -312,7 +312,13 @@
             if (typeof window.ethereum === 'undefined') {
                 document.getElementById('walletDetected').textContent = 'No Wallet Detected';
                 document.getElementById('walletDetected').className = 'status-value disconnected';
-                log('No wallet detected. Please make sure you have the Unchained Wallet app open in another tab, or install MetaMask/Coinbase Wallet.', 'error');
+
+                if (window.location.protocol === 'file:') {
+                    log('No wallet detected. You are opening this file with file://', 'error');
+                    log('If you are using the Unchained extension, go to chrome://extensions and enable "Allow access to file URLs" for it.', 'info');
+                } else {
+                    log('No wallet detected. Please make sure you have the Unchained Wallet extension or another injected wallet installed and enabled on this page.', 'error');
+                }
                 return false;
             }
 
