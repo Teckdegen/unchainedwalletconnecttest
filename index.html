@@ -260,6 +260,24 @@
                 <button class="btn-success" onclick="signMessage()">Sign Message</button>
                 <button class="btn-danger" onclick="disconnect()">Disconnect</button>
             </div>
+            <div style="margin-top: 20px; padding: 15px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;">
+                <div style="margin-bottom: 10px; font-weight: 600;">Send PEPU</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <input
+                        type="text"
+                        id="sendTo"
+                        placeholder="Recipient address (0x...)"
+                        style="padding: 10px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-family: 'Courier New', monospace; font-size: 0.9em;"
+                    />
+                    <input
+                        type="text"
+                        id="sendAmount"
+                        placeholder="Amount in PEPU (e.g. 0.01)"
+                        style="padding: 10px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 0.9em;"
+                    />
+                    <button class="btn-success" onclick="sendTransaction()">Send PEPU</button>
+                </div>
+            </div>
         </div>
 
         <!-- Log -->
@@ -641,6 +659,60 @@
                 log(`Message signed: ${signature}`, 'success');
             } catch (error) {
                 log(`Failed to sign message: ${error.message}`, 'error');
+            }
+        }
+
+        // Helper: convert decimal string PEPU amount to wei hex
+        function toWei(amountStr) {
+            const parts = amountStr.split('.');
+            const whole = parts[0] || '0';
+            const frac = (parts[1] || '').padEnd(18, '0').slice(0, 18);
+            const wholeWei = BigInt(whole) * 10n ** 18n;
+            const fracWei = BigInt(frac || '0');
+            const total = wholeWei + fracWei;
+            return '0x' + total.toString(16);
+        }
+
+        // Send PEPU transaction
+        async function sendTransaction() {
+            log('Preparing transaction...');
+            try {
+                const provider = getWalletProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No wallet detected');
+                }
+                if (!currentAccount) {
+                    throw new Error('Not connected. Please connect first.');
+                }
+
+                const toInput = document.getElementById('sendTo');
+                const amountInput = document.getElementById('sendAmount');
+                const to = toInput ? toInput.value.trim() : '';
+                const amountStr = amountInput ? amountInput.value.trim() : '';
+
+                if (!to || !to.startsWith('0x') || to.length < 10) {
+                    throw new Error('Please enter a valid recipient address');
+                }
+                if (!amountStr || isNaN(Number(amountStr))) {
+                    throw new Error('Please enter a valid amount');
+                }
+
+                const valueHex = toWei(amountStr);
+
+                log(`Sending ${amountStr} PEPU to ${to.substring(0, 6)}...${to.substring(38)}`, 'info');
+
+                const txHash = await provider.request({
+                    method: 'eth_sendTransaction',
+                    params: [{
+                        from: currentAccount,
+                        to,
+                        value: valueHex,
+                    }]
+                });
+
+                log(`Transaction sent. Hash: ${txHash}`, 'success');
+            } catch (error) {
+                log(`Failed to send transaction: ${error.message}`, 'error');
             }
         }
 
