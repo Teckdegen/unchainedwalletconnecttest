@@ -571,7 +571,7 @@
         async function switchToPEPU() {
             log('Switching to PEPU chain...');
             try {
-                const provider = getWalletProvider();
+                const provider = getUnchainedProvider();
                 if (!provider || !provider.request) {
                     throw new Error('No wallet detected');
                 }
@@ -622,7 +622,7 @@
         async function getBalance() {
             log('Fetching balance...');
             try {
-                const provider = getWalletProvider();
+                const provider = getUnchainedProvider();
                 if (!provider || !provider.request) {
                     throw new Error('No wallet detected');
                 }
@@ -646,7 +646,7 @@
         async function signMessage() {
             log('Requesting message signature...');
             try {
-                const provider = getWalletProvider();
+                const provider = getUnchainedProvider();
                 if (!provider || !provider.request) {
                     throw new Error('No wallet detected');
                 }
