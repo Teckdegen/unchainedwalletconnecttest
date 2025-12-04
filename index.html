@@ -181,12 +181,12 @@
         <h1>🔗 Unchained Wallet Connect Test</h1>
         <p class="subtitle">Test connection using any injected wallet / Unchained extension (PEPU only)</p>
         <div class="info-box" style="margin-bottom: 20px;">
-            <strong>⚠️ Important:</strong> For this page to detect a wallet, you MUST have an injected provider:<br>
-            1. Install the <strong>Unchained Wallet extension</strong> OR MetaMask / Coinbase Wallet.<br>
+            <strong>⚠️ Important:</strong> For this page to detect a wallet, you MUST have <strong>Unchained Wallet</strong>:<br>
+            1. Install and enable the <strong>Unchained Wallet extension</strong>, or open the Unchained web wallet in another tab.<br>
             2. Open this page over HTTP/HTTPS (not just <code>file://</code>)<br>
             3. If you open via <code>file://</code>, go to <code>chrome://extensions</code> and enable <strong>"Allow access to file URLs"</strong> for the Unchained extension.<br>
             <br>
-            <strong>Note:</strong> This page connects only via <code>window.ethereum.request</code> (like a normal dApp). WalletConnect / SDK flows are not used anymore.
+            <strong>Note:</strong> This page connects only to <strong>Unchained Wallet</strong> via <code>window.ethereum.request</code>.
         </div>
 
         <!-- Status Section -->
@@ -220,19 +220,19 @@
             </div>
         </div>
 
-        <!-- Connection Methods (window.ethereum only) -->
+        <!-- Connection Methods (Unchained only) -->
         <div class="section">
-            <div class="section-title">Connection Methods (Injected Wallet)</div>
+            <div class="section-title">Connection Methods (Unchained Only)</div>
             <div class="info-box">
                 <strong>Network Name:</strong> Pepe Unchained V2<br>
                 <strong>Chain ID:</strong> 97741<br>
                 <strong>RPC URL:</strong> https://rpc-pepu-v2-mainnet-0.t.conduit.xyz<br>
                 <strong>Currency Symbol:</strong> PEPU<br>
                 <strong>Block Explorer:</strong> https://pepuscan.com/<br>
-                <strong>Note:</strong> For Unchained Wallet, make sure the <strong>browser extension</strong> is installed and enabled on this page.
+                <strong>Note:</strong> Make sure the <strong>Unchained browser extension</strong> is installed and enabled on this page.
             </div>
             <div class="button-group">
-                <button class="btn-primary" onclick="connectWithWindowEthereum()">1. Connect (window.ethereum)</button>
+                <button id="connect-unchained-btn" class="btn-primary">1. Connect Unchained</button>
                 <button class="btn-primary" onclick="connectDirect()">2. Direct Connect (no extra UI)</button>
                 <button class="btn-primary" onclick="connectWithUI()">3. Simple Confirm UI</button>
             </div>
@@ -240,14 +240,14 @@
 
         <!-- Simple window.ethereum Connect -->
         <div class="section">
-            <div class="section-title">Simple window.ethereum Test</div>
+            <div class="section-title">Simple Unchained Test (window.ethereum)</div>
             <div class="info-box">
                 <strong>Goal:</strong> Test a plain <code>window.ethereum.request</code> call, like a normal dApp would do.<br>
-                Click the button below and it will just call:<br>
-                <code>window.ethereum.request({ method: 'eth_requestAccounts' })</code>
+                Click the button below and it will just call the Unchained provider:<br>
+                <code>provider.request({ method: 'eth_requestAccounts' })</code>
             </div>
             <div class="button-group">
-                <button class="btn-primary" onclick="connectWithWindowEthereum()">Connect Wallet (window.ethereum)</button>
+                <button class="btn-primary" onclick="connectUnchained()">Connect Unchained (window.ethereum)</button>
             </div>
         </div>
 
@@ -276,6 +276,33 @@
                         style="padding: 10px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 0.9em;"
                     />
                     <button class="btn-success" onclick="sendTransaction()">Send PEPU</button>
+                </div>
+            </div>
+            <div style="margin-top: 20px; padding: 15px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;">
+                <div style="margin-bottom: 10px; font-weight: 600;">Advanced Swap (Router + Calldata)</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <input
+                        type="text"
+                        id="swapRouter"
+                        placeholder="Swap router contract (0x...)"
+                        style="padding: 10px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-family: 'Courier New', monospace; font-size: 0.9em;"
+                    />
+                    <textarea
+                        id="swapData"
+                        placeholder="Swap calldata (0x...) from your dApp"
+                        style="padding: 10px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-family: 'Courier New', monospace; font-size: 0.9em; min-height: 80px;"
+                    ></textarea>
+                    <input
+                        type="text"
+                        id="swapValue"
+                        placeholder="Optional native value in PEPU (e.g. 0.01) or leave empty"
+                        style="padding: 10px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 0.9em;"
+                    />
+                    <button class="btn-success" onclick="performSwap()">Perform Swap</button>
+                </div>
+                <div style="font-size: 0.8em; opacity: 0.7; margin-top: 8px;">
+                    Paste the router address and calldata from a dApp (like Uniswap on PEPU) and this will send the same swap
+                    transaction through Unchained.
                 </div>
             </div>
         </div>
@@ -325,48 +352,32 @@
             document.getElementById('log').innerHTML = '';
         }
 
-        // Helper: pick the best provider (Unchained if available)
-        function getWalletProvider() {
-            if (typeof window !== 'undefined') {
-                if (window.unchained) return window.unchained;
-                if (window.ethereum) return window.ethereum;
-            }
-            return null;
+        // Helper to get the Unchained provider (extension or iframe)
+        function getUnchainedProvider() {
+          if (typeof window === 'undefined') return null;
+          if (window.unchained) return window.unchained;
+          if (window.ethereum && window.ethereum.isUnchained) return window.ethereum;
+          return null;
         }
 
         // Check wallet availability
         function checkWallet() {
-            const provider = getWalletProvider();
+            const provider = getUnchainedProvider();
             if (!provider) {
                 document.getElementById('walletDetected').textContent = 'No Wallet Detected';
                 document.getElementById('walletDetected').className = 'status-value disconnected';
 
                 if (window.location.protocol === 'file:') {
-                    log('No wallet detected. You are opening this file with file://', 'error');
+                    log('No Unchained wallet detected. You are opening this file with file://', 'error');
                     log('If you are using the Unchained extension, go to chrome://extensions and enable "Allow access to file URLs" for it.', 'info');
                 } else {
-                    log('No wallet detected. Please make sure you have the Unchained Wallet extension or another injected wallet installed and enabled on this page.', 'error');
+                    log('No Unchained wallet detected. Make sure the Unchained web wallet or extension is available on this page.', 'error');
                 }
                 return false;
             }
 
             const ethereum = provider;
-            let walletType = 'Unknown';
-            
-            // Check for Unchained first
-            if (ethereum.isUnchained === true) {
-                walletType = 'Unchained Wallet';
-            } else if (ethereum.isMetaMask && !ethereum.isUnchained) {
-                walletType = 'MetaMask';
-            } else if (ethereum.isCoinbaseWallet && !ethereum.isUnchained) {
-                walletType = 'Coinbase Wallet';
-            } else if (ethereum.request) {
-                // Generic injected wallet - could be Unchained if provider not fully initialized
-                walletType = 'Injected Wallet (may be Unchained)';
-                log('Note: Wallet detected but isUnchained flag not set. This may be Unchained if the provider is not initialized. Try connecting anyway.', 'info');
-            } else {
-                walletType = 'Unknown Provider';
-            }
+            let walletType = 'Unchained Wallet';
 
             document.getElementById('walletDetected').textContent = 'Yes';
             document.getElementById('walletDetected').className = 'status-value connected';
@@ -378,7 +389,7 @@
 
         // Setup event listeners
         function setupEventListeners() {
-            const provider = getWalletProvider();
+            const provider = getUnchainedProvider();
             if (!provider || !provider.on) return;
 
             provider.on('accountsChanged', (accounts) => {
@@ -440,13 +451,13 @@
         }
 
         // Simple connect using window.ethereum.request (like a normal dApp)
-        async function connectWithWindowEthereum() {
-            log('Calling provider.request({ method: \"eth_requestAccounts\" }) ...');
+        async function connectUnchained() {
+            log('Calling Unchained provider.request({ method: \"eth_requestAccounts\" }) ...');
 
-            const provider = getWalletProvider();
+            const provider = getUnchainedProvider();
             if (!provider || !provider.request) {
-                log('No injected wallet provider detected in this context.', 'error');
-                alert('No wallet detected. No injected provider is available.');
+                log('Unchained provider not detected in this context.', 'error');
+                alert('Unchained Wallet not detected. Make sure the Unchained web wallet or extension is open.');
                 return;
             }
 
@@ -460,13 +471,13 @@
                     const chainIdHex = await provider.request({ method: 'eth_chainId' });
                     currentChainId = parseInt(chainIdHex, 16);
                     updateStatus();
-                    log(`Provider connected: ${currentAccount}`, 'success');
+                    log(`Unchained connected: ${currentAccount}`, 'success');
                 } else {
-                    log('Provider returned no accounts', 'error');
+                    log('Unchained provider returned no accounts', 'error');
                 }
             } catch (error) {
-                log(`Provider request failed: ${error.message}`, 'error');
-                alert(`Provider error: ${error.message}`);
+                log(`Unchained provider request failed: ${error.message}`, 'error');
+                alert(`Unchained error: ${error.message}`);
             }
         }
 
@@ -474,7 +485,7 @@
         async function connectDirect() {
             log('Attempting direct connection (no UI)...');
             try {
-                const provider = getWalletProvider();
+                const provider = getUnchainedProvider();
                 if (!provider || !provider.request) {
                     throw new Error('No wallet detected');
                 }
@@ -521,7 +532,7 @@
         async function connectWithUI() {
             log('Attempting connection with UI selection...');
             try {
-                const provider = getWalletProvider();
+                const provider = getUnchainedProvider();
                 if (!provider || !provider.request) {
                     throw new Error('No wallet detected');
                 }
@@ -555,9 +566,6 @@
                 log(`Connection failed: ${error.message}`, 'error');
             }
         }
-
-        // 3–6: previously had Unchained-only / MetaMask / Coinbase / WalletConnect.
-        // These are removed; everything now goes through window.ethereum.
 
         // Switch to PEPU Chain
         async function switchToPEPU() {
@@ -677,7 +685,7 @@
         async function sendTransaction() {
             log('Preparing transaction...');
             try {
-                const provider = getWalletProvider();
+                const provider = getUnchainedProvider();
                 if (!provider || !provider.request) {
                     throw new Error('No wallet detected');
                 }
@@ -713,6 +721,59 @@
                 log(`Transaction sent. Hash: ${txHash}`, 'success');
             } catch (error) {
                 log(`Failed to send transaction: ${error.message}`, 'error');
+            }
+        }
+
+        // Perform advanced swap using router + calldata
+        async function performSwap() {
+            log('Preparing swap transaction...');
+            try {
+                const provider = getUnchainedProvider();
+                if (!provider || !provider.request) {
+                    throw new Error('No Unchained wallet detected');
+                }
+                if (!currentAccount) {
+                    throw new Error('Not connected. Please connect first.');
+                }
+
+                const routerInput = document.getElementById('swapRouter');
+                const dataInput = document.getElementById('swapData');
+                const valueInput = document.getElementById('swapValue');
+
+                const router = routerInput ? routerInput.value.trim() : '';
+                const data = dataInput ? dataInput.value.trim() : '';
+                const valueStr = valueInput ? valueInput.value.trim() : '';
+
+                if (!router || !router.startsWith('0x') || router.length < 10) {
+                    throw new Error('Please enter a valid router contract address');
+                }
+                if (!data || !data.startsWith('0x')) {
+                    throw new Error('Please enter valid calldata starting with 0x');
+                }
+
+                let valueHex = '0x0';
+                if (valueStr) {
+                    if (isNaN(Number(valueStr))) {
+                        throw new Error('Swap value must be a number if provided');
+                    }
+                    valueHex = toWei(valueStr);
+                }
+
+                log(`Sending swap tx to ${router.substring(0, 6)}...${router.substring(38)}`, 'info');
+
+                const txHash = await provider.request({
+                    method: 'eth_sendTransaction',
+                    params: [{
+                        from: currentAccount,
+                        to: router,
+                        value: valueHex,
+                        data: data,
+                    }]
+                });
+
+                log(`Swap transaction sent. Hash: ${txHash}`, 'success');
+            } catch (error) {
+                log(`Failed to perform swap: ${error.message}`, 'error');
             }
         }
 
