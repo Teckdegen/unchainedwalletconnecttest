@@ -179,14 +179,14 @@
 <body>
     <div class="container">
         <h1>🔗 Unchained Wallet Connect Test</h1>
-        <p class="subtitle">Test all wallet connection methods - PEPU Chain Only</p>
+        <p class="subtitle">Test connection using any injected wallet / Unchained extension (PEPU only)</p>
         <div class="info-box" style="margin-bottom: 20px;">
-            <strong>⚠️ Important:</strong> For Unchained Wallet to work, this test file should be:<br>
-            1. Served as a route in your Next.js app (e.g., create a route at <code>/test-wallet-connect</code>)<br>
-            2. OR served from the same origin as your wallet app<br>
-            3. The wallet app must be running and unlocked<br>
+            <strong>⚠️ Important:</strong> For this page to detect a wallet, you MUST have an injected provider:<br>
+            1. Install the <strong>Unchained Wallet extension</strong> OR MetaMask / Coinbase Wallet.<br>
+            2. Open this page over HTTP/HTTPS (not just <code>file://</code>)<br>
+            3. If you open via <code>file://</code>, go to <code>chrome://extensions</code> and enable <strong>"Allow access to file URLs"</strong> for the Unchained extension.<br>
             <br>
-            <strong>Note:</strong> If opened as a standalone HTML file, only MetaMask/Coinbase will work.
+            <strong>Note:</strong> This page connects only via <code>window.ethereum.request</code> (like a normal dApp). WalletConnect / SDK flows are not used anymore.
         </div>
 
         <!-- Status Section -->
@@ -220,40 +220,21 @@
             </div>
         </div>
 
-        <!-- Connection Methods -->
+        <!-- Connection Methods (window.ethereum only) -->
         <div class="section">
-            <div class="section-title">Connection Methods</div>
+            <div class="section-title">Connection Methods (Injected Wallet)</div>
             <div class="info-box">
                 <strong>Network Name:</strong> Pepe Unchained V2<br>
                 <strong>Chain ID:</strong> 97741<br>
                 <strong>RPC URL:</strong> https://rpc-pepu-v2-mainnet-0.t.conduit.xyz<br>
                 <strong>Currency Symbol:</strong> PEPU<br>
                 <strong>Block Explorer:</strong> https://pepuscan.com/<br>
-                <strong>Note:</strong> For Unchained Wallet, make sure the wallet app is open in another browser tab.
+                <strong>Note:</strong> For Unchained Wallet, make sure the <strong>browser extension</strong> is installed and enabled on this page.
             </div>
             <div class="button-group">
-                <button class="btn-primary" onclick="connectDirect()">1. Direct Connect (No UI)</button>
-                <button class="btn-primary" onclick="connectWithUI()">2. Connect with UI</button>
-                <button class="btn-primary" onclick="connectUnchainedOnly()">3. Unchained Only</button>
-                <button class="btn-primary" onclick="connectMetaMask()">4. MetaMask Only</button>
-                <button class="btn-primary" onclick="connectCoinbase()">5. Coinbase Only</button>
-            </div>
-            
-            <!-- WalletConnect URI Input -->
-            <div style="margin-top: 20px; padding: 15px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;">
-                <div style="margin-bottom: 10px; font-weight: 600;">6. WalletConnect Deeplink</div>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <input
-                        type="text"
-                        id="wcUriInput"
-                        placeholder="wc:..."
-                        style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font-family: 'Courier New', monospace; font-size: 0.9em;"
-                    />
-                    <button class="btn-primary" onclick="connectWalletConnect()" style="white-space: nowrap;">Connect via Deeplink</button>
-                </div>
-                <div style="font-size: 0.85em; opacity: 0.7; margin-top: 8px;">
-                    Paste a WalletConnect URI (starts with <code style="background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px;">wc:</code>) to connect via deeplink
-                </div>
+                <button class="btn-primary" onclick="connectWithWindowEthereum()">1. Connect (window.ethereum)</button>
+                <button class="btn-primary" onclick="connectDirect()">2. Direct Connect (no extra UI)</button>
+                <button class="btn-primary" onclick="connectWithUI()">3. Simple Confirm UI</button>
             </div>
         </div>
 
@@ -531,168 +512,8 @@
             }
         }
 
-        // 3. Unchained Only
-        async function connectUnchainedOnly() {
-            log('Attempting Unchained-only connection...');
-            try {
-                if (!checkWallet()) {
-                    throw new Error('No wallet detected');
-                }
-
-                // Check if isUnchained is set, but also allow connection if wallet exists
-                // (the provider might not be fully initialized yet)
-                if (window.ethereum.isUnchained !== true) {
-                    log('Warning: isUnchained flag not set. This might mean:', 'info');
-                    log('1. This test file is not running in the wallet app context', 'info');
-                    log('2. The provider is not initialized yet', 'info');
-                    log('3. You need to open this test file as a route in the wallet app', 'info');
-                    log('Attempting connection anyway...', 'info');
-                }
-
-                // For Unchained, the request will redirect to /connect page
-                log('Making connection request - if Unchained, you will be redirected to approve...', 'info');
-                
-                const accounts = await window.ethereum.request({
-                    method: 'eth_requestAccounts'
-                });
-
-                if (accounts && accounts.length > 0) {
-                    currentAccount = accounts[0];
-                    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
-                    currentChainId = parseInt(chainIdHex, 16);
-                    updateStatus();
-                    log(`Connected: ${currentAccount}`, 'success');
-                } else {
-                    throw new Error('No accounts returned');
-                }
-            } catch (error) {
-                const errorMsg = error.message || 'Unknown error';
-                
-                // Unchained provider redirects to /connect page - this is expected!
-                if (errorMsg.includes('Redirecting') || errorMsg.includes('redirect') || errorMsg.includes('Unexpected')) {
-                    log('✅ Redirecting to approval page...', 'success');
-                    log('You will be taken to /connect to approve the connection.', 'info');
-                    log('After approval, you will be redirected back here automatically.', 'info');
-                    // Don't show as error - this is expected behavior
-                    return;
-                }
-                
-                log(`Connection failed: ${errorMsg}`, 'error');
-                log('Tip: Make sure the Unchained Wallet app is running and unlocked.', 'info');
-            }
-        }
-
-        // 4. MetaMask Only
-        async function connectMetaMask() {
-            log('Attempting MetaMask-only connection...');
-            try {
-                if (!checkWallet()) {
-                    throw new Error('No wallet detected');
-                }
-
-                if (!window.ethereum.isMetaMask || window.ethereum.isUnchained) {
-                    throw new Error('MetaMask not detected. Please install MetaMask.');
-                }
-
-                const accounts = await window.ethereum.request({
-                    method: 'eth_requestAccounts'
-                });
-
-                if (accounts && accounts.length > 0) {
-                    currentAccount = accounts[0];
-                    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
-                    currentChainId = parseInt(chainIdHex, 16);
-                    updateStatus();
-                    log(`Connected with MetaMask: ${currentAccount}`, 'success');
-                } else {
-                    throw new Error('No accounts returned');
-                }
-            } catch (error) {
-                log(`MetaMask connection failed: ${error.message}`, 'error');
-            }
-        }
-
-        // 5. Coinbase Only
-        async function connectCoinbase() {
-            log('Attempting Coinbase-only connection...');
-            try {
-                if (!checkWallet()) {
-                    throw new Error('No wallet detected');
-                }
-
-                if (!window.ethereum.isCoinbaseWallet || window.ethereum.isUnchained) {
-                    throw new Error('Coinbase Wallet not detected. Please install Coinbase Wallet.');
-                }
-
-                const accounts = await window.ethereum.request({
-                    method: 'eth_requestAccounts'
-                });
-
-                if (accounts && accounts.length > 0) {
-                    currentAccount = accounts[0];
-                    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
-                    currentChainId = parseInt(chainIdHex, 16);
-                    updateStatus();
-                    log(`Connected with Coinbase: ${currentAccount}`, 'success');
-                } else {
-                    throw new Error('No accounts returned');
-                }
-            } catch (error) {
-                log(`Coinbase connection failed: ${error.message}`, 'error');
-            }
-        }
-
-        // 6. WalletConnect Deeplink
-        async function connectWalletConnect() {
-            const uriInput = document.getElementById('wcUriInput');
-            const uri = uriInput ? uriInput.value.trim() : '';
-            
-            if (!uri) {
-                log('Please enter a WalletConnect URI', 'error');
-                return;
-            }
-            
-            if (!uri.startsWith('wc:')) {
-                log('Invalid WalletConnect URI. Must start with "wc:"', 'error');
-                return;
-            }
-            
-            log('Connecting via WalletConnect deeplink...', 'info');
-            log(`URI: ${uri.substring(0, 50)}...`, 'info');
-            
-            try {
-                // Get the current origin (should be the wallet app origin)
-                const currentOrigin = window.location.origin;
-                
-                // Encode the URI for URL parameter
-                const encodedUri = encodeURIComponent(uri);
-                
-                // Redirect to /walletconnect page with URI parameter
-                const deeplinkUrl = `${currentOrigin}/walletconnect?uri=${encodedUri}`;
-                
-                log(`Redirecting to: ${deeplinkUrl}`, 'info');
-                log('You will be taken to the WalletConnect page to pair...', 'info');
-                
-                // Redirect to walletconnect page
-                window.location.href = deeplinkUrl;
-            } catch (error) {
-                log(`Failed to connect: ${error.message}`, 'error');
-            }
-        }
-        
-        // Check if URI is provided in URL params (for deeplink)
-        window.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const uriParam = urlParams.get('uri');
-            if (uriParam && uriParam.startsWith('wc:')) {
-                const uriInput = document.getElementById('wcUriInput');
-                if (uriInput) {
-                    uriInput.value = decodeURIComponent(uriParam);
-                    log('WalletConnect URI detected in URL', 'info');
-                    log('Click "Connect via Deeplink" to connect', 'info');
-                }
-            }
-        });
+        // 3–6: previously had Unchained-only / MetaMask / Coinbase / WalletConnect.
+        // These are removed; everything now goes through window.ethereum.
 
         // Switch to PEPU Chain
         async function switchToPEPU() {
