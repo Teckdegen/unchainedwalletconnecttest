@@ -330,11 +330,46 @@
             checkWallet();
             setupEventListeners();
             
-            // Check wallet again after a short delay (in case provider initializes late)
+            // Check wallet multiple times (extension might load at different times)
             setTimeout(() => {
                 log('Re-checking wallet status...', 'info');
                 checkWallet();
-            }, 1000);
+            }, 500);
+            
+            setTimeout(() => {
+                log('Re-checking wallet status again...', 'info');
+                checkWallet();
+            }, 1500);
+            
+            setTimeout(() => {
+                log('Final wallet status check...', 'info');
+                checkWallet();
+            }, 3000);
+        });
+
+        // Listen for provider initialization events
+        window.addEventListener('ethereum#initialized', () => {
+            log('Ethereum provider initialized event detected', 'success');
+            setTimeout(() => {
+                checkWallet();
+                setupEventListeners();
+            }, 100);
+        });
+        
+        window.addEventListener('unchained#initialized', () => {
+            log('Unchained provider initialized event detected', 'success');
+            setTimeout(() => {
+                checkWallet();
+                setupEventListeners();
+            }, 100);
+        });
+        
+        window.addEventListener('unchainedProviderReady', (event) => {
+            log('Unchained provider ready event detected', 'success');
+            setTimeout(() => {
+                checkWallet();
+                setupEventListeners();
+            }, 100);
         });
 
         // Logging utility
@@ -355,15 +390,37 @@
         // Helper to get the Unchained provider (extension or iframe)
         function getUnchainedProvider() {
           if (typeof window === 'undefined') return null;
-          if (window.unchained) return window.unchained;
-          if (window.ethereum && window.ethereum.isUnchained) return window.ethereum;
+          
+          // Check window.unchained first (extension's primary namespace)
+          if (window.unchained && window.unchained.isUnchained) {
+            return window.unchained;
+          }
+          
+          // Check window.ethereum for Unchained provider
+          if (window.ethereum) {
+            // Check if it's the Unchained provider
+            if (window.ethereum.isUnchained) {
+              return window.ethereum;
+            }
+            // Check if it has Unchained metadata
+            if (window.ethereum._unchainedMetadata) {
+              return window.ethereum;
+            }
+          }
+          
+          // Wait a bit and check again (extension might be loading)
           return null;
         }
 
         // Check wallet availability
         function checkWallet() {
+            // Check for extension first
             const provider = getUnchainedProvider();
-            if (!provider) {
+            
+            // Also check if chrome.runtime is available (indicates extension context)
+            const isExtensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+            
+            if (!provider && !isExtensionContext) {
                 document.getElementById('walletDetected').textContent = 'No Wallet Detected';
                 document.getElementById('walletDetected').className = 'status-value disconnected';
 
@@ -371,20 +428,39 @@
                     log('No Unchained wallet detected. You are opening this file with file://', 'error');
                     log('If you are using the Unchained extension, go to chrome://extensions and enable "Allow access to file URLs" for it.', 'info');
                 } else {
-                    log('No Unchained wallet detected. Make sure the Unchained web wallet or extension is available on this page.', 'error');
+                    log('No Unchained wallet detected. Make sure the Unchained extension is installed and enabled.', 'error');
+                    log('Checking for window.unchained:', !!window.unchained, 'info');
+                    log('Checking for window.ethereum:', !!window.ethereum, 'info');
+                    if (window.ethereum) {
+                        log('window.ethereum.isUnchained:', window.ethereum.isUnchained, 'info');
+                    }
                 }
                 return false;
             }
 
-            const ethereum = provider;
-            let walletType = 'Unchained Wallet';
+            // If we have a provider, use it
+            if (provider) {
+                const ethereum = provider;
+                let walletType = 'Unchained Wallet Extension';
 
-            document.getElementById('walletDetected').textContent = 'Yes';
-            document.getElementById('walletDetected').className = 'status-value connected';
-            document.getElementById('walletType').textContent = walletType;
-            log(`Wallet detected: ${walletType}`, 'success');
+                document.getElementById('walletDetected').textContent = 'Yes';
+                document.getElementById('walletDetected').className = 'status-value connected';
+                document.getElementById('walletType').textContent = walletType;
+                log(`Wallet detected: ${walletType}`, 'success');
+                log(`Provider available at: ${window.unchained ? 'window.unchained' : 'window.ethereum'}`, 'success');
+                
+                return true;
+            }
             
-            return true;
+            // If extension context but no provider yet, it might still be loading
+            if (isExtensionContext) {
+                document.getElementById('walletDetected').textContent = 'Extension Detected (Loading...)';
+                document.getElementById('walletDetected').className = 'status-value';
+                log('Extension context detected, but provider not ready yet. Waiting...', 'info');
+                return false;
+            }
+            
+            return false;
         }
 
         // Setup event listeners
